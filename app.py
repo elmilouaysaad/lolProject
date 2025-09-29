@@ -7,7 +7,7 @@ import os
 app = Flask(__name__)
 
 # Global variables to store the trained model and info
-model_pipeline = None
+model_pipeline = None 
 model_info = None
 
 def load_saved_model():
