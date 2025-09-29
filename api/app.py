@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 import os
 
+# Create Flask app
 app = Flask(__name__)
 
 # Global variables to store the trained model and info
@@ -14,13 +15,33 @@ def load_saved_model():
     """Load your pre-trained model from file"""
     global model_pipeline, model_info
     
-    # For Vercel, the files are in the project root
-    model_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'lol_model.pkl')
-    info_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'model_info.pkl')
+    # Try multiple paths for Vercel deployment
+    possible_paths = [
+        # Current directory
+        ('lol_model.pkl', 'model_info.pkl'),
+        # Parent directory
+        ('../lol_model.pkl', '../model_info.pkl'),
+        # Root directory
+        (os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lol_model.pkl'),
+         os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'model_info.pkl')),
+        # Absolute paths for Vercel
+        ('/var/task/lol_model.pkl', '/var/task/model_info.pkl')
+    ]
     
-    # Check if model files exist
-    if not os.path.exists(model_file):
-        raise FileNotFoundError(f"Model file '{model_file}' not found.")
+    model_file = None
+    info_file = None
+    
+    for model_path, info_path in possible_paths:
+        if os.path.exists(model_path):
+            model_file = model_path
+            info_file = info_path
+            break
+    
+    if model_file is None:
+        # List current directory contents for debugging
+        current_dir = os.getcwd()
+        files = os.listdir(current_dir)
+        raise FileNotFoundError(f"Model file not found. Current directory: {current_dir}, Files: {files}")
     
     # Load the trained model
     with open(model_file, 'rb') as f:
@@ -76,7 +97,17 @@ def predict_win_probability(team_kills, team_deaths, team_assists,
     
     return win_probability
 
-@app.route('/api/predict', methods=['POST'])
+@app.route('/', methods=['GET'])
+@app.route('/api', methods=['GET'])
+def root():
+    """Root endpoint for API status"""
+    return jsonify({
+        'status': 'LoL Win Predictor API is running',
+        'endpoints': ['/api/predict', '/api/health']
+    })
+
+@app.route('/predict', methods=['POST'])
+@app.route('/api/predict', methods=['POST'])  # Support both routes
 def predict():
     """API endpoint for predictions"""
     try:
@@ -111,6 +142,34 @@ def predict():
             'success': False,
             'error': str(e)
         }), 400
+
+@app.route('/health', methods=['GET'])
+@app.route('/api/health', methods=['GET'])
+def health():
+    """Health check endpoint"""
+    try:
+        import os
+        current_dir = os.getcwd()
+        files = os.listdir(current_dir)
+        
+        # Try to load the model to verify everything works
+        if model_pipeline is None:
+            load_saved_model()
+        
+        return jsonify({
+            'status': 'healthy',
+            'model_loaded': model_pipeline is not None,
+            'current_directory': current_dir,
+            'files_in_directory': files[:10],  # Show first 10 files
+            'python_path': os.path.abspath(__file__)
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'current_directory': os.getcwd(),
+            'files_in_directory': os.listdir(os.getcwd())[:10]
+        }), 500
 
 # For local testing
 if __name__ == '__main__':
