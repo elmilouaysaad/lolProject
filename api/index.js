@@ -1,7 +1,8 @@
-// LoL Win Predictor API - JavaScript Version with ML Model
+// LoL Win Predictor API - JavaScript with Python ML Model
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { spawn } = require('child_process');
 
 const app = express();
 
@@ -10,106 +11,73 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Trained Model Parameters (extracted from Python scikit-learn model)
-const MODEL_COEFFICIENTS = {
-  intercept: 0.16557694182444183,
-  coefficients: {
-    dragon: -0.06754431637790291,
-    gold_diff: 1.107003659509875,
-    gold_per_kill: -0.04172765965075479,
-    team_kda: 0.18168310391014147,
-    enemy_kda: 0.1254660638024227,
-  }
-};
+// Function to call Python model service
+function callPythonModel(teamKills, teamDeaths, teamAssists, 
+                        enemyKills, enemyDeaths, enemyAssists,
+                        teamGold, enemyGold, dragonAcquisition) {
+    return new Promise((resolve, reject) => {
+        // Use the model.py in the parent directory
+        const pythonProcess = spawn('python', [
+            path.join(__dirname, '..', 'model.py'),
+            teamKills.toString(),
+            teamDeaths.toString(),
+            teamAssists.toString(),
+            enemyKills.toString(),
+            enemyDeaths.toString(),
+            enemyAssists.toString(),
+            teamGold.toString(),
+            enemyGold.toString(),
+            dragonAcquisition
+        ]);
 
-const SCALER_PARAMS = {
-  mean: {
-    dragon: 0.743439226519337,
-    gold_diff: 91.50207182320442,
-    gold_per_kill: 3273.1575801210556,
-    team_kda: 1.5382003167182776,
-    enemy_kda: 1.486699221816108,
-  },
-  scale: {
-    dragon: 0.8319366312774551,
-    gold_diff: 2008.1471700613831,
-    gold_per_kill: 2309.458855246555,
-    team_kda: 2.4424573288528224,
-    enemy_kda: 2.3236194700520625,
-  }
-};
+        let dataString = '';
+        let errorString = '';
 
-// ML Model Implementation in JavaScript
-function mlPrediction(teamKills, teamDeaths, teamAssists, 
-                     enemyKills, enemyDeaths, enemyAssists,
-                     teamGold, enemyGold, dragonAcquisition) {
-    
-    // Calculate features exactly like the Python model
-    const teamKda = (teamKills + teamAssists) / Math.max(1, teamDeaths);
-    const enemyKda = (enemyKills + enemyAssists) / Math.max(1, enemyDeaths);
-    const goldDiff = teamGold - enemyGold;
-    const totalKills = teamKills + enemyKills;
-    const goldPerKill = (teamGold + enemyGold) / Math.max(1, totalKills);
-    const dragon = dragonAcquisition.toLowerCase() === 'team' ? 1 : 0;
+        pythonProcess.stdout.on('data', (data) => {
+            dataString += data.toString();
+        });
 
-    // Create features array
-    const features = {
-        dragon: dragon,
-        gold_diff: goldDiff,
-        gold_per_kill: goldPerKill,
-        team_kda: teamKda,
-        enemy_kda: enemyKda
-    };
+        pythonProcess.stderr.on('data', (data) => {
+            errorString += data.toString();
+        });
 
-    // Apply StandardScaler normalization (same as Python)
-    const scaledFeatures = {};
-    for (const [feature, value] of Object.entries(features)) {
-        scaledFeatures[feature] = (value - SCALER_PARAMS.mean[feature]) / SCALER_PARAMS.scale[feature];
-    }
+        pythonProcess.on('close', (code) => {
+            if (code === 0) {
+                try {
+                    const result = JSON.parse(dataString.trim());
+                    resolve(result);
+                } catch (e) {
+                    reject(new Error(`Failed to parse Python output: ${e.message}\nOutput: ${dataString}`));
+                }
+            } else {
+                reject(new Error(`Python process failed with code ${code}: ${errorString}`));
+            }
+        });
 
-    // Calculate logistic regression prediction
-    let logits = MODEL_COEFFICIENTS.intercept;
-    for (const [feature, scaledValue] of Object.entries(scaledFeatures)) {
-        logits += scaledValue * MODEL_COEFFICIENTS.coefficients[feature];
-    }
-
-    // Apply sigmoid function to get probability
-    const winProbability = 1 / (1 + Math.exp(-logits));
-
-    return {
-        win_probability: winProbability,
-        features: features,
-        scaled_features: scaledFeatures,
-        logits: logits
-    };
+        pythonProcess.on('error', (error) => {
+            reject(new Error(`Failed to start Python process: ${error.message}`));
+        });
+    });
 }
 
 // Routes
 app.get('/', (req, res) => {
     res.json({
         status: 'LoL Win Predictor API is running',
-        mode: 'Trained ML Model (Pure JavaScript)',
+        mode: 'Python ML Model Service',
         endpoints: ['/api/predict', '/api/health', '/api/test'],
-        version: '4.0.0',
-        model_info: {
-            accuracy: 0.701,
-            algorithm: 'Logistic Regression with Standard Scaler',
-            features: ['dragon', 'gold_diff', 'gold_per_kill', 'team_kda', 'enemy_kda']
-        }
+        version: '5.0.0',
+        note: 'Using Python scikit-learn model for predictions'
     });
 });
 
 app.get('/api', (req, res) => {
     res.json({
         status: 'LoL Win Predictor API is running',
-        mode: 'Trained ML Model (Pure JavaScript)',
+        mode: 'Python ML Model Service', 
         endpoints: ['/api/predict', '/api/health', '/api/test'],
-        version: '4.0.0',
-        model_info: {
-            accuracy: 0.701,
-            algorithm: 'Logistic Regression with Standard Scaler',
-            features: ['dragon', 'gold_diff', 'gold_per_kill', 'team_kda', 'enemy_kda']
-        }
+        version: '5.0.0',
+        note: 'Using Python scikit-learn model for predictions'
     });
 });
 
@@ -118,12 +86,12 @@ app.get('/api/test', (req, res) => {
         test: 'JavaScript API is working',
         route: '/api/test',
         domain: 'lol-project-gamma.vercel.app',
-        runtime: 'Pure JavaScript ML Model',
+        runtime: 'Node.js + Python ML Model',
         timestamp: new Date().toISOString()
     });
 });
 
-app.post('/api/predict', (req, res) => {
+app.post('/api/predict', async (req, res) => {
     try {
         const {
             team_kills,
@@ -145,8 +113,8 @@ app.post('/api/predict', (req, res) => {
             });
         }
 
-        // Get prediction using trained ML model
-        const prediction = mlPrediction(
+        // Call Python model service for prediction
+        const prediction = await callPythonModel(
             parseInt(team_kills),
             parseInt(team_deaths),
             parseInt(team_assists),
@@ -158,31 +126,27 @@ app.post('/api/predict', (req, res) => {
             dragon_acquisition
         );
 
-        const winProbPercent = Math.round(prediction.win_probability * 100 * 100) / 100;
-
-        res.json({
-            success: true,
-            win_probability: winProbPercent,
-            message: `Your team has a ${winProbPercent}% chance of winning!`,
-            note: 'Prediction from trained Logistic Regression model (JavaScript implementation)',
-            calculated_stats: {
-                team_kda: Math.round(prediction.features.team_kda * 100) / 100,
-                enemy_kda: Math.round(prediction.features.enemy_kda * 100) / 100,
-                gold_difference: prediction.features.gold_diff,
-                gold_per_kill: Math.round(prediction.features.gold_per_kill),
-                dragon_advantage: dragon_acquisition
-            },
-            model_info: {
-                accuracy: 0.701,
-                algorithm: 'Logistic Regression',
-                raw_probability: Math.round(prediction.win_probability * 10000) / 10000
-            }
-        });
+        if (prediction.success) {
+            res.json({
+                success: true,
+                win_probability: prediction.win_probability,
+                message: `Your team has a ${prediction.win_probability}% chance of winning!`,
+                note: 'Prediction from Python scikit-learn model',
+                calculated_stats: prediction.calculated_stats,
+                model_info: prediction.model_info,
+                prediction_label: prediction.prediction_label
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: prediction.error
+            });
+        }
     } catch (error) {
         res.status(500).json({
             success: false,
             error: error.message,
-            note: 'Error in ML model prediction'
+            note: 'Error calling Python ML model service'
         });
     }
 });
@@ -191,18 +155,13 @@ app.get('/api/health', (req, res) => {
     try {
         res.json({
             status: 'healthy',
-            mode: 'pure javascript ml model',
-            runtime: 'Node.js',
+            mode: 'python ml model service',
+            runtime: 'Node.js + Python',
             version: process.version,
             uptime: process.uptime(),
             memory: process.memoryUsage(),
             timestamp: new Date().toISOString(),
-            note: 'Running trained ML model natively in JavaScript',
-            model_info: {
-                accuracy: 0.701,
-                algorithm: 'Logistic Regression with Standard Scaler',
-                implementation: 'Native JavaScript (no Python dependencies)'
-            }
+            note: 'Running Node.js API with Python scikit-learn model'
         });
     } catch (error) {
         res.status(500).json({
