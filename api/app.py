@@ -174,3 +174,7 @@ def health():
 # For local testing
 if __name__ == '__main__':
     app.run(debug=True)
+
+# Vercel entry point - expose the app
+def handler(request, response):
+    return app(request, response)
