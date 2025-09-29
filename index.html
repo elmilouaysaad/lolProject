@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>League of Legends Win Predictor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f1b3c 0%, #1e3c72 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 90%;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #c9aa71;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .team-section {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid transparent;
+        }
+
+        .team-blue {
+            border-color: #3498db;
+        }
+
+        .team-red {
+            border-color: #e74c3c;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .blue-title {
+            color: #3498db;
+        }
+
+        .red-title {
+            color: #e74c3c;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #ecf0f1;
+            font-weight: 500;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 16px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #c9aa71;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        input[type="number"]::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .dragon-section {
+            grid-column: span 2;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #c9aa71;
+        }
+
+        .dragon-title {
+            color: #c9aa71;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+        }
+
+        .dragon-options {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .dragon-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #c9aa71;
+        }
+
+        .dragon-option label {
+            margin-bottom: 0;
+            cursor: pointer;
+        }
+
+        .predict-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(45deg, #c9aa71, #f4e4bc);
+            color: #0f1b3c;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .predict-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(201, 170, 113, 0.4);
+        }
+
+        .predict-btn:active {
+            transform: translateY(0);
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: none;
+        }
+
+        .result.success {
+            background: rgba(46, 204, 113, 0.2);
+            border: 2px solid #2ecc71;
+            color: #2ecc71;
+        }
+
+        .result.error {
+            background: rgba(231, 76, 60, 0.2);
+            border: 2px solid #e74c3c;
+            color: #e74c3c;
+        }
+
+        .model-stats {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(201, 170, 113, 0.1);
+            border: 2px solid #c9aa71;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .model-stats h3 {
+            color: #c9aa71;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 1.2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #c9aa71;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #c9aa71;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .dragon-section {
+                grid-column: span 1;
+            }
+            
+            .dragon-options {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LoL Win Predictor</h1>
+        
+        <form id="predictForm">
+            <div class="form-grid">
+                <!-- Team Section -->
+                <div class="team-section team-blue">
+                    <h2 class="section-title blue-title">Your Team Stats</h2>
+                    
+                    <div class="form-group">
+                        <label for="team_kills">Total Kills:</label>
+                        <input type="number" id="team_kills" name="team_kills" min="0" required placeholder="e.g. 15">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="team_deaths">Total Deaths:</label>
+                        <input type="number" id="team_deaths" name="team_deaths" min="0" required placeholder="e.g. 8">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="team_assists">Total Assists:</label>
+                        <input type="number" id="team_assists" name="team_assists" min="0" required placeholder="e.g. 22">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="team_gold">Total Gold:</label>
+                        <input type="number" id="team_gold" name="team_gold" min="0" required placeholder="e.g. 45000">
+                    </div>
+                </div>
+
+                <!-- Enemy Section -->
+                <div class="team-section team-red">
+                    <h2 class="section-title red-title">Enemy Team</h2>
+                    
+                    <div class="form-group">
+                        <label for="enemy_kills">Total Kills:</label>
+                        <input type="number" id="enemy_kills" name="enemy_kills" min="0" required placeholder="e.g. 12">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="enemy_deaths">Total Deaths:</label>
+                        <input type="number" id="enemy_deaths" name="enemy_deaths" min="0" required placeholder="e.g. 15">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="enemy_assists">Total Assists:</label>
+                        <input type="number" id="enemy_assists" name="enemy_assists" min="0" required placeholder="e.g. 18">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="enemy_gold">Total Gold:</label>
+                        <input type="number" id="enemy_gold" name="enemy_gold" min="0" required placeholder="e.g. 42000">
+                    </div>
+                </div>
+
+                <!-- Dragon Section -->
+                <div class="dragon-section">
+                    <h3 class="dragon-title">Dragon Acquisition</h3>
+                    <div class="dragon-options">
+                        <div class="dragon-option">
+                            <input type="radio" id="dragon_team" name="dragon_acquisition" value="team" required>
+                            <label for="dragon_team">Your Team</label>
+                        </div>
+                        <div class="dragon-option">
+                            <input type="radio" id="dragon_enemy" name="dragon_acquisition" value="enemy" required>
+                            <label for="dragon_enemy">Enemy Team</label>
+                        </div>
+                        <div class="dragon-option">
+                            <input type="radio" id="dragon_none" name="dragon_acquisition" value="none" required>
+                            <label for="dragon_none">None</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="predict-btn">Predict Win Probability</button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Calculating your win probability...</p>
+        </div>
+
+        <div class="result" id="result"></div>
+        
+        <div class="model-stats" id="modelStats">
+            <h3>Model Input Parameters</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Team KDA</div>
+                    <div class="stat-value" id="calcTeamKDA">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Enemy KDA</div>
+                    <div class="stat-value" id="calcEnemyKDA">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Gold Difference</div>
+                    <div class="stat-value" id="calcGoldDiff">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Gold per Kill</div>
+                    <div class="stat-value" id="calcGoldPerKill">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Dragon Advantage</div>
+                    <div class="stat-value" id="calcDragon">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to calculate and display model parameters
+        function calculateAndDisplayStats(data) {
+            // Calculate the same parameters as the backend model
+            const teamKDA = (data.team_kills + data.team_assists) / Math.max(1, data.team_deaths);
+            const enemyKDA = (data.enemy_kills + data.enemy_assists) / Math.max(1, data.enemy_deaths);
+            const goldDiff = data.team_gold - data.enemy_gold;
+            const totalKills = data.team_kills + data.enemy_kills;
+            const goldPerKill = (data.team_gold + data.enemy_gold) / Math.max(1, totalKills);
+            
+            // Dragon mapping
+            let dragonText = '';
+            if (data.dragon_acquisition === 'team') {
+                dragonText = 'Team (+1)';
+            } else if (data.dragon_acquisition === 'enemy') {
+                dragonText = 'Enemy (0)';
+            } else {
+                dragonText = 'None (0)';
+            }
+            
+            // Update the display
+            document.getElementById('calcTeamKDA').textContent = teamKDA.toFixed(2);
+            document.getElementById('calcEnemyKDA').textContent = enemyKDA.toFixed(2);
+            document.getElementById('calcGoldDiff').textContent = goldDiff >= 0 ? `+${goldDiff}` : goldDiff.toString();
+            document.getElementById('calcGoldPerKill').textContent = goldPerKill.toFixed(0);
+            document.getElementById('calcDragon').textContent = dragonText;
+            
+            // Show the stats section
+            document.getElementById('modelStats').style.display = 'block';
+        }
+
+        document.getElementById('predictForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Show loading, hide result and stats
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('modelStats').style.display = 'none';
+            
+            // Collect form data directly
+            const formData = new FormData(e.target);
+            const data = {
+                team_kills: parseInt(formData.get('team_kills')),
+                team_deaths: parseInt(formData.get('team_deaths')),
+                team_assists: parseInt(formData.get('team_assists')),
+                enemy_kills: parseInt(formData.get('enemy_kills')),
+                enemy_deaths: parseInt(formData.get('enemy_deaths')),
+                enemy_assists: parseInt(formData.get('enemy_assists')),
+                team_gold: parseInt(formData.get('team_gold')),
+                enemy_gold: parseInt(formData.get('enemy_gold')),
+                dragon_acquisition: formData.get('dragon_acquisition')
+            };
+            
+            // Calculate and show the model parameters
+            calculateAndDisplayStats(data);
+            
+            try {
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                // Hide loading
+                document.getElementById('loading').style.display = 'none';
+                
+                // Show result
+                const resultDiv = document.getElementById('result');
+                resultDiv.style.display = 'block';
+                
+                if (result.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <div style="font-size: 1.5rem; margin-bottom: 10px; font-weight: bold;">
+                            ${result.win_probability >= 60 ? 'Excellent!' : result.win_probability >= 40 ? 'Balanced' : 'Challenging'}
+                        </div>
+                        <div>${result.message}</div>
+                        <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">
+                            ${result.win_probability >= 70 ? 'Looking very promising!' : 
+                              result.win_probability >= 50 ? 'It could go either way!' : 
+                              'You might want to play more defensively!'}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <div style="font-size: 1.5rem; margin-bottom: 10px; font-weight: bold;">Error</div>
+                        <div>Error: ${result.error}</div>
+                    `;
+                }
+            } catch (error) {
+                // Hide loading
+                document.getElementById('loading').style.display = 'none';
+                
+                // Show error
+                const resultDiv = document.getElementById('result');
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <div style="font-size: 1.5rem; margin-bottom: 10px; font-weight: bold;">Error</div>
+                    <div>Error: ${error.message}</div>
+                `;
+            }
+        });
+
+        // Add some interactive effects
+        document.querySelectorAll('input[type="number"]').forEach(input => {
+            input.addEventListener('focus', function() {
+                this.style.transform = 'scale(1.02)';
+            });
+            
+            input.addEventListener('blur', function() {
+                this.style.transform = 'scale(1)';
+            });
+        });
+    </script>
+</body>
+</html>
